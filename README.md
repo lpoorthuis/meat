@@ -18,6 +18,29 @@ go install meat.dev/cmd/meat@latest
 Run with `meat` to review the latest commit.
 It takes git-looking parameters to pick commits to review.
 
+By default meat uses OpenAI. It also supports Gemini and Claude through Vertex
+AI using [Application Default Credentials](https://cloud.google.com/docs/authentication/provide-credentials-adc):
+
+```
+gcloud auth application-default login
+export GOOGLE_CLOUD_PROJECT="my-project"
+export GOOGLE_CLOUD_LOCATION="global" # optional; global is the default
+
+# Gemini through the Google Gen AI SDK
+export MEAT_MODEL="vertex/gemini-2.5-pro"
+meat
+
+# Claude from Vertex AI Model Garden through the Anthropic SDK
+export MEAT_MODEL="vertex/claude-sonnet-4@20250514"
+meat
+```
+
+The part after `vertex/` is passed to Vertex unchanged, so any enabled text
+model with function calling can be selected without a meat release. Models
+whose IDs start with `claude-` use Anthropic's Vertex API; other `vertex/*`
+models use Vertex GenerateContent. The Vertex AI API and the selected model
+must be enabled for the project.
+
 It takes a while to process a commit for reading.
 So I suggest you have an agent build `meat` into your devtools so that
 it pre-processes it.
