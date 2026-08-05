@@ -63,6 +63,34 @@ func TestVertexAnthropicGenerateAndReplayToolCall(t *testing.T) {
 	}
 }
 
+func TestVertexAnthropicLocation(t *testing.T) {
+	tests := []struct {
+		name     string
+		model    string
+		location string
+		region   string
+		want     string
+	}{
+		{name: "Opus 5 maps European region to EU", model: "claude-opus-5", location: "europe-west1", want: "eu"},
+		{name: "Sonnet 5 maps US region to US", model: "claude-sonnet-5", location: "us-east5", want: "us"},
+		{name: "Opus 5 defaults to EU", model: "claude-opus-5", want: "eu"},
+		{name: "Opus 5 preserves global", model: "claude-opus-5", location: "global", want: "global"},
+		{name: "Opus 5 snapshot is multi-region", model: "claude-opus-5@20260801", location: "europe-west1", want: "eu"},
+		{name: "regional model preserves location", model: "claude-opus-4.7", location: "europe-west1", want: "europe-west1"},
+		{name: "regional model reads region alias", model: "claude-opus-4.7", region: "us-east5", want: "us-east5"},
+		{name: "regional model defaults global", model: "claude-opus-4.7", want: "global"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("GOOGLE_CLOUD_LOCATION", test.location)
+			t.Setenv("GOOGLE_CLOUD_REGION", test.region)
+			if got := vertexAnthropicLocation(test.model); got != test.want {
+				t.Errorf("vertexAnthropicLocation(%q) = %q, want %q", test.model, got, test.want)
+			}
+		})
+	}
+}
+
 func TestVertexAnthropicMaxTokensIsError(t *testing.T) {
 	_, err := responseFromVertexAnthropic(&anthropic.Message{StopReason: anthropic.StopReasonMaxTokens})
 	if err == nil || !strings.Contains(err.Error(), "truncated") {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -28,13 +29,7 @@ func NewVertexAnthropicFromEnv(ctx context.Context, model string) (*VertexAnthro
 	if project == "" {
 		return nil, fmt.Errorf("no Google Cloud project: set GOOGLE_CLOUD_PROJECT")
 	}
-	location := os.Getenv("GOOGLE_CLOUD_LOCATION")
-	if location == "" {
-		location = os.Getenv("GOOGLE_CLOUD_REGION")
-	}
-	if location == "" {
-		location = "global"
-	}
+	location := vertexAnthropicLocation(model)
 	credentials, err := google.FindDefaultCredentials(ctx, googleCloudScope)
 	if err != nil {
 		return nil, fmt.Errorf("find Google Application Default Credentials: %w", err)
@@ -52,6 +47,39 @@ func NewVertexAnthropicFromEnv(ctx context.Context, model string) (*VertexAnthro
 			return client.Messages.New(ctx, params)
 		},
 	}, nil
+}
+
+// vertexAnthropicLocation maps models that only support multi-region endpoints
+// to the matching EU/US pool. Other models use the configured location directly.
+func vertexAnthropicLocation(model string) string {
+	location := os.Getenv("GOOGLE_CLOUD_LOCATION")
+	if location == "" {
+		location = os.Getenv("GOOGLE_CLOUD_REGION")
+	}
+	if !requiresVertexAnthropicMultiRegion(model) {
+		if location == "" {
+			return "global"
+		}
+		return location
+	}
+
+	normalized := strings.ToLower(strings.TrimSpace(location))
+	switch {
+	case normalized == "eu", normalized == "us", normalized == "global":
+		return normalized
+	case strings.HasPrefix(normalized, "europe-"):
+		return "eu"
+	case strings.HasPrefix(normalized, "us-"):
+		return "us"
+	default:
+		return "eu"
+	}
+}
+
+func requiresVertexAnthropicMultiRegion(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	model = strings.SplitN(model, "@", 2)[0]
+	return model == "claude-opus-5" || model == "claude-sonnet-5"
 }
 
 // Generate implements Model using Anthropic's Vertex AI adapter.
