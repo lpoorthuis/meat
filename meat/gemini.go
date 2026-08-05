@@ -26,13 +26,7 @@ func NewGeminiFromEnv(ctx context.Context, model string) (*GeminiModel, error) {
 	if project == "" {
 		return nil, fmt.Errorf("no Google Cloud project: set GOOGLE_CLOUD_PROJECT")
 	}
-	location := os.Getenv("GOOGLE_CLOUD_LOCATION")
-	if location == "" {
-		location = os.Getenv("GOOGLE_CLOUD_REGION")
-	}
-	if location == "" {
-		location = "global"
-	}
+	location := geminiLocation(model)
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		Backend:  genai.BackendEnterprise,
 		Project:  project,
@@ -47,6 +41,27 @@ func NewGeminiFromEnv(ctx context.Context, model string) (*GeminiModel, error) {
 			return client.Models.GenerateContent(ctx, model, contents, config)
 		},
 	}, nil
+}
+
+// geminiLocation keeps regional models on the configured location and routes
+// models that Agent Platform only publishes globally to the global endpoint.
+func geminiLocation(model string) string {
+	if requiresGeminiGlobal(model) {
+		return "global"
+	}
+	location := os.Getenv("GOOGLE_CLOUD_LOCATION")
+	if location == "" {
+		location = os.Getenv("GOOGLE_CLOUD_REGION")
+	}
+	if location == "" {
+		return "global"
+	}
+	return location
+}
+
+func requiresGeminiGlobal(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	return model == "gemini-3.6-flash" || strings.HasPrefix(model, "gemini-3.6-flash-")
 }
 
 // Generate implements Model using Gemini Enterprise's GenerateContent API.

@@ -75,6 +75,31 @@ func TestGeminiGenerateAndReplayToolCall(t *testing.T) {
 	}
 }
 
+func TestGeminiLocation(t *testing.T) {
+	tests := []struct {
+		name     string
+		model    string
+		location string
+		region   string
+		want     string
+	}{
+		{name: "Gemini 3.6 Flash is global", model: "gemini-3.6-flash", location: "europe-west1", want: "global"},
+		{name: "Gemini 3.6 Flash snapshot is global", model: "gemini-3.6-flash-001", location: "us-central1", want: "global"},
+		{name: "Gemini 2.5 Pro preserves location", model: "gemini-2.5-pro", location: "europe-west1", want: "europe-west1"},
+		{name: "regional model reads region alias", model: "gemini-2.5-pro", region: "us-central1", want: "us-central1"},
+		{name: "unset location defaults global", model: "gemini-2.5-pro", want: "global"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("GOOGLE_CLOUD_LOCATION", test.location)
+			t.Setenv("GOOGLE_CLOUD_REGION", test.region)
+			if got := geminiLocation(test.model); got != test.want {
+				t.Errorf("geminiLocation(%q) = %q, want %q", test.model, got, test.want)
+			}
+		})
+	}
+}
+
 func TestGeminiMaxTokensIsError(t *testing.T) {
 	_, err := responseFromGemini(&genai.GenerateContentResponse{Candidates: []*genai.Candidate{{
 		FinishReason: genai.FinishReasonMaxTokens,
