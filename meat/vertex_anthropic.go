@@ -41,6 +41,9 @@ func NewVertexAnthropicFromEnv(ctx context.Context, model string) (*VertexAnthro
 	}
 	client := anthropic.NewClient(
 		option.WithoutEnvironmentDefaults(),
+		// Four retries plus the initial request, with the SDK's exponential
+		// backoff and Retry-After handling for 429s and transient 5xxs.
+		option.WithMaxRetries(4),
 		vertex.WithCredentials(ctx, location, project, credentials),
 	)
 	return &VertexAnthropicModel{

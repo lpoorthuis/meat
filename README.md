@@ -39,7 +39,9 @@ The part after `vertex/` is passed to Vertex unchanged, so any enabled text
 model with function calling can be selected without a meat release. Models
 whose IDs start with `claude-` use Anthropic's Vertex API; other `vertex/*`
 models use Vertex GenerateContent. The Vertex AI API and the selected model
-must be enabled for the project.
+must be enabled for the project. Prefer `global` unless regional processing is
+a requirement: regional endpoints use separate, model-specific quota pools.
+Claude 429 and transient 5xx responses are retried with exponential backoff.
 
 It takes a while to process a commit for reading.
 So I suggest you have an agent build `meat` into your devtools so that
