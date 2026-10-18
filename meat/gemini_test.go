@@ -76,6 +76,8 @@ func TestGeminiGenerateAndReplayToolCall(t *testing.T) {
 }
 
 func TestGeminiLocation(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_LOCATION", "ignored-location")
+	t.Setenv("GOOGLE_CLOUD_REGION", "ignored-region")
 	tests := []struct {
 		name     string
 		model    string
@@ -91,8 +93,8 @@ func TestGeminiLocation(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Setenv("GOOGLE_CLOUD_LOCATION", test.location)
-			t.Setenv("GOOGLE_CLOUD_REGION", test.region)
+			t.Setenv("MEAT_GOOGLE_CLOUD_LOCATION", test.location)
+			t.Setenv("MEAT_GOOGLE_CLOUD_REGION", test.region)
 			if got := geminiLocation(test.model); got != test.want {
 				t.Errorf("geminiLocation(%q) = %q, want %q", test.model, got, test.want)
 			}

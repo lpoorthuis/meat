@@ -25,7 +25,7 @@
 //	git diff main...HEAD | meat
 //
 // It reads provider credentials from the environment: OpenAI or Anthropic API
-// keys, or Google Application Default Credentials for vertex/* models.
+// keys, or Google Application Default Credentials for google/* and vertex/* models.
 package main
 
 import (
@@ -77,10 +77,11 @@ Environment:
   OPENAI_BASE_URL      Optional. Override the OpenAI API base URL.
   ANTHROPIC_API_KEY    API key for Claude models.
   ANTHROPIC_BASE_URL   Optional. Override the Anthropic API base URL.
-  GOOGLE_CLOUD_PROJECT Project for vertex/* Gemini and Claude models.
-  GOOGLE_CLOUD_LOCATION Optional. Vertex location (default global).
-  GOOGLE_CLOUD_REGION  Optional alias for GOOGLE_CLOUD_LOCATION.
-  MEAT_MODEL           Optional. Default model id. Prefix Google models with vertex/.
+  MEAT_GOOGLE_CLOUD_PROJECT  Project for Google models (defaults to credential file's project_id).
+  MEAT_GOOGLE_CLOUD_LOCATION Optional. Vertex location (default global).
+  MEAT_GOOGLE_CLOUD_REGION   Optional alias for MEAT_GOOGLE_CLOUD_LOCATION.
+  MEAT_GOOGLE_APPLICATION_CREDENTIALS Optional. Credential JSON file (overrides ADC).
+  MEAT_MODEL           Optional. Default model id. Prefix Google models with google/ (vertex/ also supported).
   MEAT_CACHE           Optional. Cache directory (default ~/.meat; empty disables).
 
 On an exe.dev VM with an attached "llm" integration, meat uses the managed

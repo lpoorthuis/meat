@@ -3,6 +3,7 @@ module meat.dev
 go 1.24.13
 
 require (
+	cloud.google.com/go/auth/oauth2adapt v0.2.4
 	github.com/anthropics/anthropic-sdk-go v1.61.0
 	golang.org/x/oauth2 v0.35.0
 	google.golang.org/genai v1.66.0
@@ -11,7 +12,6 @@ require (
 require (
 	cloud.google.com/go v0.116.0 // indirect
 	cloud.google.com/go/auth v0.9.3 // indirect
-	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect

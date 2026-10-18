@@ -28,14 +28,14 @@ func resolveModel(model, fallback string) string {
 }
 
 // NewModelFromEnv constructs the built-in backend appropriate for model.
-// vertex/* model IDs use Google Cloud credentials, Claude model IDs use direct
-// Anthropic Messages, and all other IDs use OpenAI Responses.
+// google/* and legacy vertex/* model IDs use Google Cloud credentials, Claude
+// model IDs use direct Anthropic Messages, and all other IDs use OpenAI Responses.
 func NewModelFromEnv(ctx context.Context, model string) (Model, error) {
 	model = ResolveModel(model)
 	if isVertexModel(model) {
-		vertexModel := strings.TrimPrefix(model, "vertex/")
+		_, vertexModel, _ := strings.Cut(model, "/")
 		if vertexModel == "" {
-			return nil, fmt.Errorf("vertex model id is empty")
+			return nil, fmt.Errorf("Google Cloud model id is empty")
 		}
 		if isAnthropicModel(vertexModel) {
 			return NewVertexAnthropicFromEnv(ctx, vertexModel)

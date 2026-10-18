@@ -10,7 +10,6 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/vertex"
-	"golang.org/x/oauth2/google"
 )
 
 const vertexAnthropicProvider = "vertex-anthropic"
@@ -23,16 +22,16 @@ type VertexAnthropicModel struct {
 }
 
 // NewVertexAnthropicFromEnv builds a Claude-on-Vertex client using Application
-// Default Credentials and the standard Google Cloud project/location variables.
+// Default Credentials and meat-specific Google Cloud project/location variables.
 func NewVertexAnthropicFromEnv(ctx context.Context, model string) (*VertexAnthropicModel, error) {
-	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
-	if project == "" {
-		return nil, fmt.Errorf("no Google Cloud project: set GOOGLE_CLOUD_PROJECT")
-	}
 	location := vertexAnthropicLocation(model)
-	credentials, err := google.FindDefaultCredentials(ctx, googleCloudScope)
+	project, err := googleProject(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("find Google Application Default Credentials: %w", err)
+		return nil, err
+	}
+	credentials, err := googleCredentials(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load Google credentials: %w", err)
 	}
 	client := anthropic.NewClient(
 		option.WithoutEnvironmentDefaults(),
@@ -52,9 +51,9 @@ func NewVertexAnthropicFromEnv(ctx context.Context, model string) (*VertexAnthro
 // vertexAnthropicLocation maps models that only support multi-region endpoints
 // to the matching EU/US pool. Other models use the configured location directly.
 func vertexAnthropicLocation(model string) string {
-	location := os.Getenv("GOOGLE_CLOUD_LOCATION")
+	location := os.Getenv("MEAT_GOOGLE_CLOUD_LOCATION")
 	if location == "" {
-		location = os.Getenv("GOOGLE_CLOUD_REGION")
+		location = os.Getenv("MEAT_GOOGLE_CLOUD_REGION")
 	}
 	if !requiresVertexAnthropicMultiRegion(model) {
 		if location == "" {

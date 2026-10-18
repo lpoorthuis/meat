@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"cloud.google.com/go/auth/oauth2adapt"
 	"google.golang.org/genai"
 )
 
@@ -20,18 +21,26 @@ type GeminiModel struct {
 }
 
 // NewGeminiFromEnv builds a Gemini Enterprise model from Google Cloud's
-// standard project, location, and Application Default Credentials configuration.
+// meat-specific project/location variables and Application Default Credentials.
 func NewGeminiFromEnv(ctx context.Context, model string) (*GeminiModel, error) {
-	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
-	if project == "" {
-		return nil, fmt.Errorf("no Google Cloud project: set GOOGLE_CLOUD_PROJECT")
+	project, err := googleProject(ctx)
+	if err != nil {
+		return nil, err
 	}
 	location := geminiLocation(model)
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+	config := &genai.ClientConfig{
 		Backend:  genai.BackendEnterprise,
 		Project:  project,
 		Location: location,
-	})
+	}
+	if os.Getenv(meatGoogleCredentialsEnv) != "" {
+		credentials, err := googleCredentials(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("load Google credentials: %w", err)
+		}
+		config.Credentials = oauth2adapt.AuthCredentialsFromOauth2Credentials(credentials)
+	}
+	client, err := genai.NewClient(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("create Gemini Enterprise client: %w", err)
 	}
@@ -49,9 +58,9 @@ func geminiLocation(model string) string {
 	if requiresGeminiGlobal(model) {
 		return "global"
 	}
-	location := os.Getenv("GOOGLE_CLOUD_LOCATION")
+	location := os.Getenv("MEAT_GOOGLE_CLOUD_LOCATION")
 	if location == "" {
-		location = os.Getenv("GOOGLE_CLOUD_REGION")
+		location = os.Getenv("MEAT_GOOGLE_CLOUD_REGION")
 	}
 	if location == "" {
 		return "global"
@@ -243,4 +252,6 @@ func responseFromGemini(resp *genai.GenerateContentResponse) (*Response, error) 
 	return out, nil
 }
 
-func isVertexModel(model string) bool { return strings.HasPrefix(model, "vertex/") }
+func isVertexModel(model string) bool {
+	return strings.HasPrefix(model, "google/") || strings.HasPrefix(model, "vertex/")
+}
