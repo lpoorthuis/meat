@@ -72,6 +72,7 @@ func TestDiscoverExeGatewayBase_Team(t *testing.T) {
 }
 
 func TestNewAnthropicFromEnv_PrefersExplicitKey(t *testing.T) {
+	t.Setenv("MEAT_MODEL", "")
 	t.Setenv("ANTHROPIC_API_KEY", "sk-explicit")
 	t.Setenv("ANTHROPIC_BASE_URL", "")
 	// Even on an exe.dev VM with an llm integration, an explicit key wins.
@@ -169,8 +170,8 @@ func TestNewModelFromEnv_DefaultsToOpenAIThroughGateway(t *testing.T) {
 	if !ok {
 		t.Fatalf("default backend = %T, want *OpenAIModel", model)
 	}
-	if m.Model != "gpt-5.6-sol" {
-		t.Errorf("Model = %q, want gpt-5.6-sol", m.Model)
+	if m.Model != "gpt-6.1-sol" {
+		t.Errorf("Model = %q, want gpt-6.1-sol", m.Model)
 	}
 	if m.BaseURL != "https://llm.int.exe.xyz/openai" {
 		t.Errorf("BaseURL = %q, want gateway OpenAI prefix", m.BaseURL)

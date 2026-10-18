@@ -14,7 +14,7 @@ import (
 )
 
 // DefaultOpenAIModel is meat's default OpenAI Responses API model.
-const DefaultOpenAIModel = "gpt-5.6-sol"
+const DefaultOpenAIModel = "gpt-6.1-sol"
 
 // DefaultReasoningEffort is the thinking level used by OpenAIModel when no
 // explicit effort is configured.

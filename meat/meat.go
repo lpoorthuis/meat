@@ -18,7 +18,7 @@
 // and merged (see chunk.go).
 //
 // The package is provider-agnostic: callers supply a Model. The command
-// meat.dev ships built-in OpenAI Responses and Anthropic Messages models;
+// meat.dev ships OpenAI, Anthropic, Google Cloud, and Copilot models;
 // embedders such as Shelley can still adapt their own LLM client.
 package meat
 
@@ -144,6 +144,11 @@ func abridgeOne(ctx context.Context, model Model, req Request, opts runOptions) 
 	callerCtx := ctx
 	ctx, cancel := context.WithTimeout(ctx, abridgeBudget)
 	defer cancel()
+	if factory, ok := model.(conversationFactory); ok {
+		var closeConversation func()
+		model, closeConversation = factory.newConversation()
+		defer closeConversation()
+	}
 
 	tb := &toolbox{root: req.RepoRoot, rawDiff: req.UnifiedDiff, noMoves: opts.chunkRun, moves: opts.chunkMoves}
 	tools := tb.tools()

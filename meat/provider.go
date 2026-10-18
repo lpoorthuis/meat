@@ -28,10 +28,17 @@ func resolveModel(model, fallback string) string {
 }
 
 // NewModelFromEnv constructs the built-in backend appropriate for model.
-// google/* and legacy vertex/* model IDs use Google Cloud credentials, Claude
-// model IDs use direct Anthropic Messages, and all other IDs use OpenAI Responses.
+// copilot/<model> uses the Copilot SDK and existing CLI login. google/* and
+// legacy vertex/* IDs use Google Cloud credentials, Claude IDs use direct
+// Anthropic Messages, and all other IDs use OpenAI Responses.
 func NewModelFromEnv(ctx context.Context, model string) (Model, error) {
 	model = ResolveModel(model)
+	if model == "copilot" {
+		return nil, fmt.Errorf("Copilot requires an explicit model id; use copilot/<model>")
+	}
+	if strings.HasPrefix(model, "copilot/") {
+		return NewCopilotFromEnv(strings.TrimPrefix(model, "copilot/"))
+	}
 	if isVertexModel(model) {
 		_, vertexModel, _ := strings.Cut(model, "/")
 		if vertexModel == "" {

@@ -25,7 +25,8 @@
 //	git diff main...HEAD | meat
 //
 // It reads provider credentials from the environment: OpenAI or Anthropic API
-// keys, or Google Application Default Credentials for google/* and vertex/* models.
+// keys, Google Application Default Credentials for google/* and vertex/* models,
+// or the Copilot CLI login for copilot/<model>.
 package main
 
 import (
@@ -35,7 +36,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"meat.dev/meat"
@@ -44,13 +47,16 @@ import (
 const usage = `meat — abridge a diff into a "reading diff"
 
 Usage:
-  meat                 Summarize the most recent commit (HEAD) in the current git repo.
-  meat <revision>      Summarize a specific commit or revision (e.g. a sha, HEAD~3).
-  meat <range>         Diff across a commit range (e.g. sha1..sha2, main...HEAD).
-  meat -staged         Abridge the staged (index) changes: git diff --staged.
-  meat -w              Abridge the unstaged working-tree changes: git diff.
-  git show <sha> | meat   Abridge the diff piped on stdin.
-  git diff | meat         Abridge the working-tree diff piped on stdin.
+  meat                   Summarize the most recent commit (HEAD) in the current
+                         git repo.
+  meat <revision>        Summarize a specific commit or revision (e.g. a sha,
+                         HEAD~3).
+  meat <range>           Diff across a commit range (e.g. sha1..sha2,
+                         main...HEAD).
+  meat -staged           Abridge the staged (index) changes: git diff --staged.
+  meat -w                Abridge the unstaged working-tree changes: git diff.
+  git show <sha> | meat  Abridge the diff piped on stdin.
+  git diff | meat        Abridge the working-tree diff piped on stdin.
 
 meat reads a unified diff (from stdin, from a named revision or range, or HEAD
 when stdin is a terminal), asks an LLM to drop everything not worth reading, and
@@ -65,28 +71,42 @@ On an interactive terminal the diff is colored and paged like git show (using
 your git pager and color.diff config); piped/redirected output stays plain.
 
 Flags:
-  -model string   Model to use (default $MEAT_MODEL or a built-in default).
-  -no-cache       Ignore any cached result and recompute (still updates cache).
-  -staged         Read the staged changes (git diff --staged).
-  -w              Read the unstaged working-tree changes (git diff).
-  -json           Emit the result as JSON on stdout (no color, no pager).
-  -h, --help      Show this help.
+  -model string          Model to use (default $MEAT_MODEL or a built-in
+                         default).
+  -list-models copilot   List enabled Copilot model IDs without reading a diff.
+  -no-cache              Ignore any cached result and recompute (still updates
+                         cache).
+  -staged                Read the staged changes (git diff --staged).
+  -w                     Read the unstaged working-tree changes (git diff).
+  -json                  Emit the result as JSON on stdout (no color, no pager).
+  -h, --help             Show this help.
 
 Environment:
-  OPENAI_API_KEY       API key for OpenAI models (including the default).
-  OPENAI_BASE_URL      Optional. Override the OpenAI API base URL.
-  ANTHROPIC_API_KEY    API key for Claude models.
-  ANTHROPIC_BASE_URL   Optional. Override the Anthropic API base URL.
-  MEAT_GOOGLE_CLOUD_PROJECT  Project for Google models (defaults to credential file's project_id).
-  MEAT_GOOGLE_CLOUD_LOCATION Optional. Vertex location (default global).
-  MEAT_GOOGLE_CLOUD_REGION   Optional alias for MEAT_GOOGLE_CLOUD_LOCATION.
-  MEAT_GOOGLE_APPLICATION_CREDENTIALS Optional. Credential JSON file (overrides ADC).
-  MEAT_MODEL           Optional. Default model id. Prefix Google models with google/ (vertex/ also supported).
-  MEAT_CACHE           Optional. Cache directory (default ~/.meat; empty disables).
+  OPENAI_API_KEY         API key for OpenAI models (including the default).
+  OPENAI_BASE_URL        Optional. Override the OpenAI API base URL.
+  ANTHROPIC_API_KEY      API key for Claude models.
+  ANTHROPIC_BASE_URL     Optional. Override the Anthropic API base URL.
+  MEAT_GOOGLE_CLOUD_PROJECT
+                         Project for Google models (defaults to credential
+                         file's project_id).
+  MEAT_GOOGLE_CLOUD_LOCATION
+                         Optional. Vertex location (default global).
+  MEAT_GOOGLE_CLOUD_REGION
+                         Optional alias for MEAT_GOOGLE_CLOUD_LOCATION.
+  MEAT_GOOGLE_APPLICATION_CREDENTIALS
+                         Optional. Credential JSON file (overrides ADC).
+  MEAT_MODEL             Optional. Default model id (gpt-6.1-sol).
+                         Use copilot/<model> for a Copilot subscription;
+                         vertex/<model> or google/<model> for Google Cloud.
+  MEAT_COPILOT_CLI       Optional. Copilot CLI path (otherwise COPILOT_CLI_PATH
+                         or PATH).
+  MEAT_CACHE             Optional. Cache directory (default ~/.meat; empty
+                         disables).
 
 On an exe.dev VM with an attached "llm" integration, meat uses the managed
 LLM gateway automatically — no API key needed. Provider-specific API keys or
-base URLs override the gateway.
+base URLs override the gateway. Copilot models use the existing Copilot CLI
+login instead (run copilot login); SDK usage consumes your Copilot allowance.
 `
 
 func main() {
@@ -94,6 +114,7 @@ func main() {
 	fs.SetOutput(os.Stderr)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 	model := fs.String("model", "", "model to use (default $MEAT_MODEL or built-in default)")
+	listModels := fs.String("list-models", "", "list enabled models for a provider (copilot)")
 	noCache := fs.Bool("no-cache", false, "ignore any cached result and recompute (still updates the cache)")
 	staged := fs.Bool("staged", false, "read the staged changes (git diff --staged)")
 	worktree := fs.Bool("w", false, "read the unstaged working-tree changes (git diff)")
@@ -104,6 +125,28 @@ func main() {
 			os.Exit(0)
 		}
 		os.Exit(2)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if *listModels != "" {
+		if *listModels != "copilot" {
+			fatal("-list-models supports copilot")
+		}
+		if fs.NArg() != 0 || *model != "" || *staged || *worktree || *jsonOut || *noCache {
+			fatal("-list-models cannot be combined with diff/model/output flags or revisions")
+		}
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		models, err := meat.ListCopilotModels(ctx)
+		if err != nil {
+			fatal("%v", err)
+		}
+		for _, id := range models {
+			fmt.Printf("copilot/%s\n", id)
+		}
+		return
 	}
 
 	diff, source, err := readDiff(fs.Args(), *staged, *worktree)
@@ -168,7 +211,7 @@ func main() {
 		render:   render,
 		stderr:   os.Stderr,
 	}
-	if err := run(context.Background(), opts); err != nil {
+	if err := run(ctx, opts); err != nil {
 		if interactive {
 			fmt.Fprint(os.Stderr, "\r\x1b[K")
 		}

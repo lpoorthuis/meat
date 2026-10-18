@@ -35,6 +35,20 @@ func TestCacheKeyDependsOnDiffModelAndRubric(t *testing.T) {
 	}
 }
 
+func TestCopilotCacheIdentity(t *testing.T) {
+	key := func(model string) string { return cacheKey("diff", meat.ResolveModel(model), "rubric") }
+	if key("copilot/gpt-6.1-sol") == key("gpt-6.1-sol") {
+		t.Fatal("Copilot and direct OpenAI must not share a cache entry")
+	}
+	if key("copilot/gpt-6.1-sol") == key("copilot/gpt-5.6-sol") {
+		t.Fatal("different Copilot models must not share a cache entry")
+	}
+	t.Setenv("MEAT_MODEL", "copilot/claude-haiku-5.5")
+	if key("") != key("copilot/claude-haiku-5.5") {
+		t.Fatal("the cache must use the explicit environment model unchanged")
+	}
+}
+
 func TestCacheRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	key := cacheKey("some diff", "m", "r")

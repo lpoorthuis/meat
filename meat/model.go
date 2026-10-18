@@ -68,14 +68,21 @@ type Response struct {
 }
 
 // Model is the minimal LLM interface meat needs. It is provider-agnostic: the
-// CLI uses the built-in OpenAI or Anthropic implementation, while embedders
-// such as Shelley supply their own by adapting an existing LLM client.
+// CLI ships OpenAI, Anthropic, Google Cloud, and Copilot implementations, while
+// embedders such as Shelley can adapt an existing LLM client.
 //
 // Generate sends the system prompt, the conversation so far, and the available
 // tools, and returns the model's next message. Implementations should surface
 // tool calls as Blocks of type "tool_use".
 type Model interface {
 	Generate(ctx context.Context, system string, messages []Message, tools []Tool) (*Response, error)
+}
+
+// conversationFactory lets stateful providers scope transport state to one
+// single-run abridgement, including each chunk, without changing Model's public
+// contract. Cleanup runs on every exit path (submit, fallback, error, cancel).
+type conversationFactory interface {
+	newConversation() (Model, func())
 }
 
 // textBlock is a small constructor for a user/assistant text block.
